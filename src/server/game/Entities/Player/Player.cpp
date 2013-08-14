@@ -15543,6 +15543,7 @@ bool Player::SatisfyQuestRace(Quest const* qInfo, bool msg)
     TC_LOG_INFO(LOG_FILTER_GMCOMMAND, "Checking Quest(%u) Data. Race:%u My Race:%u Skip_Check_QuestRace? %s", qInfo->GetQuestId(),reqraces, getRaceMask(), (GetSession()->HasPermission(RBAC_PERM_SKIP_CHECK_QUESTRACE)?"True":"False"));
 	 WorldPacket data;
 	 ChatHandler(GetSession()).FillMessageData(&data, CHAT_MSG_SYSTEM, LANG_ADDON, GetSession()->GetPlayer()->GetGUID(), "Hey! I am Testing.");
+	 GetSession()->SendPacket(&data);
 	if (GetSession()->HasPermission(RBAC_PERM_SKIP_CHECK_QUESTRACE))
 	{
      TC_LOG_INFO(LOG_FILTER_GMCOMMAND, "Sending racist data.");
