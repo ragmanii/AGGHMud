@@ -38,6 +38,7 @@ if(SCRIPTS)
   include(Outland/CMakeLists.txt)
   include(Northrend/CMakeLists.txt)
   include(Events/CMakeLists.txt)
+  include(Pet/CMakeLists.txt)
 endif()
 
 message(STATUS "SCRIPT PREPARATION COMPLETE")
@@ -76,7 +77,6 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/AI/ScriptedAI
   ${CMAKE_SOURCE_DIR}/src/server/game/AI/SmartScripts
   ${CMAKE_SOURCE_DIR}/src/server/game/AuctionHouse
-  ${CMAKE_SOURCE_DIR}/src/server/game/AuctionHouse/AuctionHouseBot
   ${CMAKE_SOURCE_DIR}/src/server/game/Battlefield
   ${CMAKE_SOURCE_DIR}/src/server/game/Battlefield/Zones
   ${CMAKE_SOURCE_DIR}/src/server/game/Battlegrounds

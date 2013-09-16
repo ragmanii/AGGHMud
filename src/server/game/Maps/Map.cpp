@@ -820,6 +820,8 @@ void Map::MoveAllCreaturesInMoveList()
         {
             // update pos
             c->Relocate(c->_newPosition);
+            if (c->IsVehicle())
+                c->GetVehicleKit()->RelocatePassengers();
             //CreatureRelocationNotify(c, new_cell, new_cell.cellCoord());
             c->UpdateObjectVisibility(false);
         }
@@ -2112,6 +2114,10 @@ void Map::AddObjectToRemoveList(WorldObject* obj)
 void Map::AddObjectToSwitchList(WorldObject* obj, bool on)
 {
     ASSERT(obj->GetMapId() == GetId() && obj->GetInstanceId() == GetInstanceId());
+    // i_objectsToSwitch is iterated only in Map::RemoveAllObjectsInRemoveList() and it uses
+    // the contained objects only if GetTypeId() == TYPEID_UNIT , so we can return in all other cases
+    if (obj->GetTypeId() != TYPEID_UNIT)
+        return;
 
     std::map<WorldObject*, bool>::iterator itr = i_objectsToSwitch.find(obj);
     if (itr == i_objectsToSwitch.end())
@@ -2401,6 +2407,8 @@ bool InstanceMap::AddPlayerToMap(Player* player)
                 mapSave = sInstanceSaveMgr->AddInstanceSave(GetId(), GetInstanceId(), Difficulty(GetSpawnMode()), 0, true);
             }
 
+            ASSERT(mapSave);
+
             // check for existing instance binds
             InstancePlayerBind* playerBind = player->GetBoundInstance(GetId(), Difficulty(GetSpawnMode()));
             if (playerBind && playerBind->perm)
@@ -2435,10 +2443,7 @@ bool InstanceMap::AddPlayerToMap(Player* player)
                         if (groupBind->save != mapSave)
                         {
                             TC_LOG_ERROR(LOG_FILTER_MAPS, "InstanceMap::Add: player %s(%d) is being put into instance %d, %d, %d but he is in group %d which is bound to instance %d, %d, %d!", player->GetName().c_str(), player->GetGUIDLow(), mapSave->GetMapId(), mapSave->GetInstanceId(), mapSave->GetDifficulty(), GUID_LOPART(group->GetLeaderGUID()), groupBind->save->GetMapId(), groupBind->save->GetInstanceId(), groupBind->save->GetDifficulty());
-                            if (mapSave)
-                                TC_LOG_ERROR(LOG_FILTER_MAPS, "MapSave players: %d, group count: %d", mapSave->GetPlayerCount(), mapSave->GetGroupCount());
-                            else
-                                TC_LOG_ERROR(LOG_FILTER_MAPS, "MapSave NULL");
+                            TC_LOG_ERROR(LOG_FILTER_MAPS, "MapSave players: %d, group count: %d", mapSave->GetPlayerCount(), mapSave->GetGroupCount());
                             if (groupBind->save)
                                 TC_LOG_ERROR(LOG_FILTER_MAPS, "GroupBind save players: %d, group count: %d", groupBind->save->GetPlayerCount(), groupBind->save->GetGroupCount());
                             else

@@ -75,6 +75,8 @@ void CreatureAI::DoZoneInCombat(Creature* creature /*= NULL*/, float maxRangeToN
         }
     }
 
+    // Intended duplicated check, the code above this should select a victim
+    // If it can't find a suitable attack target then we should error out.
     if (!creature->HasReactState(REACT_PASSIVE) && !creature->GetVictim())
     {
         TC_LOG_ERROR(LOG_FILTER_GENERAL, "DoZoneInCombat called for creature that has empty threat list (creature entry = %u)", creature->GetEntry());
@@ -225,8 +227,9 @@ bool CreatureAI::_EnterEvadeMode()
     if (!me->IsAlive())
         return false;
 
-    // dont remove vehicle auras, passengers arent supposed to drop off the vehicle
-    me->RemoveAllAurasExceptType(SPELL_AURA_CONTROL_VEHICLE);
+    // don't remove vehicle auras, passengers aren't supposed to drop off the vehicle
+    // don't remove clone caster on evade (to be verified)
+    me->RemoveAllAurasExceptType(SPELL_AURA_CONTROL_VEHICLE, SPELL_AURA_CLONE_CASTER);
 
     // sometimes bosses stuck in combat?
     me->DeleteThreatList();

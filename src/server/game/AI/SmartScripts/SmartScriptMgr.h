@@ -94,7 +94,7 @@ enum SMART_EVENT
     SMART_EVENT_OOC_LOS                  = 10,      // NoHostile, MaxRnage, CooldownMin, CooldownMax
     SMART_EVENT_RESPAWN                  = 11,      // type, MapId, ZoneId
     SMART_EVENT_TARGET_HEALTH_PCT        = 12,      // HPMin%, HPMax%, RepeatMin, RepeatMax
-    SMART_EVENT_TARGET_CASTING           = 13,      // RepeatMin, RepeatMax
+    SMART_EVENT_TARGET_CASTING           = 13,      // RepeatMin, RepeatMax, spellid
     SMART_EVENT_FRIENDLY_HEALTH          = 14,      // HPDeficit, Radius, RepeatMin, RepeatMax
     SMART_EVENT_FRIENDLY_IS_CC           = 15,      // Radius, RepeatMin, RepeatMax
     SMART_EVENT_FRIENDLY_MISSING_BUFF    = 16,      // SpellId, Radius, RepeatMin, RepeatMax
@@ -155,8 +155,9 @@ enum SMART_EVENT
     SMART_EVENT_GO_EVENT_INFORM          = 71,      // eventId
     SMART_EVENT_ACTION_DONE              = 72,      // eventId (SharedDefines.EventId)
     SMART_EVENT_ON_SPELLCLICK            = 73,      // clicker (unit)
+    SMART_EVENT_FRIENDLY_HEALTH_PCT      = 74,      // minHpPct, maxHpPct, repeatMin, repeatMax
 
-    SMART_EVENT_END                      = 74
+    SMART_EVENT_END                      = 75
 };
 
 struct SmartEvent
@@ -214,11 +215,18 @@ struct SmartEvent
 
         struct
         {
+            uint32 repeatMin;
+            uint32 repeatMax;
+            uint32 spellId;
+        } targetCasting;
+
+        struct
+        {
             uint32 hpDeficit;
             uint32 radius;
             uint32 repeatMin;
             uint32 repeatMax;
-        } friendlyHealt;
+        } friendlyHealth;
 
         struct
         {
@@ -363,6 +371,14 @@ struct SmartEvent
 
         struct
         {
+            uint32 minHpPct;
+            uint32 maxHpPct;
+            uint32 repeatMin;
+            uint32 repeatMax;
+        } friendlyHealthPct;
+
+        struct
+        {
             uint32 param1;
             uint32 param2;
             uint32 param3;
@@ -385,7 +401,7 @@ enum SMART_ACTION
     SMART_ACTION_TALK                               = 1,      // groupID from creature_text, duration to wait before TEXT_OVER event is triggered
     SMART_ACTION_SET_FACTION                        = 2,      // FactionId (or 0 for default)
     SMART_ACTION_MORPH_TO_ENTRY_OR_MODEL            = 3,      // Creature_template entry(param1) OR ModelId (param2) (or 0 for both to demorph)
-    SMART_ACTION_SOUND                              = 4,      // SoundId, TextRange
+    SMART_ACTION_SOUND                              = 4,      // SoundId, onlySelf
     SMART_ACTION_PLAY_EMOTE                         = 5,      // EmoteId
     SMART_ACTION_FAIL_QUEST                         = 6,      // QuestID
     SMART_ACTION_ADD_QUEST                          = 7,      // QuestID
@@ -397,7 +413,7 @@ enum SMART_ACTION
     SMART_ACTION_THREAT_SINGLE_PCT                  = 13,     // Threat%
     SMART_ACTION_THREAT_ALL_PCT                     = 14,     // Threat%
     SMART_ACTION_CALL_AREAEXPLOREDOREVENTHAPPENS    = 15,     // QuestID
-    SMART_ACTION_SEND_CASTCREATUREORGO              = 16,     // QuestID, SpellId
+    SMART_ACTION_UNUSED_16                          = 16,     // UNUSED
     SMART_ACTION_SET_EMOTE_STATE                    = 17,     // emoteID
     SMART_ACTION_SET_UNIT_FLAG                      = 18,     // Flags (may be more than one field OR'd together), Target
     SMART_ACTION_REMOVE_UNIT_FLAG                   = 19,     // Flags (may be more than one field OR'd together), Target
@@ -408,7 +424,7 @@ enum SMART_ACTION
     SMART_ACTION_EVADE                              = 24,     // No Params
     SMART_ACTION_FLEE_FOR_ASSIST                    = 25,     // With Emote
     SMART_ACTION_CALL_GROUPEVENTHAPPENS             = 26,     // QuestID
-    SMART_ACTION_CALL_CASTEDCREATUREORGO            = 27,     // CreatureId, SpellId
+    // none                                         = 27,
     SMART_ACTION_REMOVEAURASFROMSPELL               = 28,     // Spellid, 0 removes all auras
     SMART_ACTION_FOLLOW                             = 29,     // Distance (0 = default), Angle (0 = default), EndCreatureEntry, credit, creditType (0monsterkill, 1event)
     SMART_ACTION_RANDOM_PHASE                       = 30,     // PhaseId1, PhaseId2, PhaseId3...
@@ -429,7 +445,7 @@ enum SMART_ACTION
     SMART_ACTION_SET_DATA                           = 45,     // Field, Data (only creature @todo)
     SMART_ACTION_MOVE_FORWARD                       = 46,     // distance
     SMART_ACTION_SET_VISIBILITY                     = 47,     // on/off
-    SMART_ACTION_SET_ACTIVE                         = 48,     // No Params
+    SMART_ACTION_SET_ACTIVE                         = 48,     // on/off
     SMART_ACTION_ATTACK_START                       = 49,     //
     SMART_ACTION_SUMMON_GO                          = 50,     // GameObjectID, DespawnTime in ms,
     SMART_ACTION_KILL_UNIT                          = 51,     //
@@ -489,8 +505,13 @@ enum SMART_ACTION
     SMART_ACTION_ADD_GO_FLAG                        = 105,    // Flags
     SMART_ACTION_REMOVE_GO_FLAG                     = 106,    // Flags
     SMART_ACTION_SUMMON_CREATURE_GROUP              = 107,    // Group, attackInvoker
+    SMART_ACTION_SET_POWER                          = 108,    // PowerType, newPower
+    SMART_ACTION_ADD_POWER                          = 109,    // PowerType, newPower
+    SMART_ACTION_REMOVE_POWER                       = 110,    // PowerType, newPower
+    SMART_ACTION_GAME_EVENT_STOP                    = 111,    // GameEventId
+    SMART_ACTION_GAME_EVENT_START                   = 112,    // GameEventId
 
-    SMART_ACTION_END                                = 108
+    SMART_ACTION_END                                = 113
 };
 
 struct SmartAction
@@ -519,7 +540,7 @@ struct SmartAction
         struct
         {
             uint32 sound;
-            uint32 range;
+            uint32 onlySelf;
         } sound;
 
         struct
@@ -574,12 +595,6 @@ struct SmartAction
 
         struct
         {
-            uint32 quest;
-            uint32 spell;
-        } castCreatureOrGO;
-
-        struct
-        {
             uint32 flag1;
             uint32 flag2;
             uint32 flag3;
@@ -618,12 +633,6 @@ struct SmartAction
             uint32 inc;
             uint32 dec;
         } incEventPhase;
-
-        struct
-        {
-            uint32 creature;
-            uint32 spell;
-        } castedCreatureOrGO;
 
         struct
         {
@@ -725,6 +734,11 @@ struct SmartAction
             uint32 entry;
             uint32 despawnTime;
         } summonGO;
+
+        struct
+         {
+            uint32 state;
+        } active;
 
         struct
         {
@@ -939,6 +953,22 @@ struct SmartAction
             uint32 attackInvoker;
         } creatureGroup;
 
+        struct
+        {
+            uint32 powerType;
+            uint32 newPower;
+        } power;
+
+        struct
+        {
+            uint32 id;
+        } gameEventStop;
+
+        struct
+        {
+            uint32 id;
+        } gameEventStart;
+
         //! Note for any new future actions
         //! All parameters must have type uint32
 
@@ -992,7 +1022,10 @@ enum SMARTAI_TARGETS
     SMART_TARGET_ACTION_INVOKER_VEHICLE         = 22,   // Unit's vehicle who caused this Event to occur
     SMART_TARGET_OWNER_OR_SUMMONER              = 23,   // Unit's owner or summoner
     SMART_TARGET_THREAT_LIST                    = 24,   // All units on creature's threat list
-    SMART_TARGET_END                            = 25
+    SMART_TARGET_CLOSEST_ENEMY                  = 25,   // maxDist
+    SMART_TARGET_CLOSEST_FRIENDLY               = 26,   // maxDist
+
+    SMART_TARGET_END                            = 27
 };
 
 struct SmartTarget
@@ -1073,6 +1106,16 @@ struct SmartTarget
             uint32 dist;
             uint32 dead;
         } closest;
+
+        struct
+        {
+            uint32 maxDist;
+        } closestAttackable;
+
+        struct
+        {
+            uint32 maxDist;
+        } closestFriendly;
 
         struct
         {
@@ -1211,7 +1254,8 @@ const uint32 SmartAIEventMask[SMART_EVENT_END][2] =
     {SMART_EVENT_GO_STATE_CHANGED,          SMART_SCRIPT_TYPE_MASK_GAMEOBJECT },
     {SMART_EVENT_GO_EVENT_INFORM,           SMART_SCRIPT_TYPE_MASK_GAMEOBJECT },
     {SMART_EVENT_ACTION_DONE,               SMART_SCRIPT_TYPE_MASK_CREATURE },
-    {SMART_EVENT_ON_SPELLCLICK,             SMART_SCRIPT_TYPE_MASK_CREATURE }
+    {SMART_EVENT_ON_SPELLCLICK,             SMART_SCRIPT_TYPE_MASK_CREATURE },
+    {SMART_EVENT_FRIENDLY_HEALTH_PCT,       SMART_SCRIPT_TYPE_MASK_CREATURE },
 };
 
 enum SmartEventFlags

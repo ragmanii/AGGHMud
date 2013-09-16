@@ -45,8 +45,6 @@
 #include "CreatureAI.h"
 #include "BattlegroundMgr.h"
 #include "Battleground.h"
-#include "BattlegroundEY.h"
-#include "BattlegroundWS.h"
 #include "OutdoorPvPMgr.h"
 #include "Language.h"
 #include "SocialMgr.h"
@@ -919,13 +917,13 @@ void Spell::EffectTriggerSpell(SpellEffIndex effIndex)
     SpellCastTargets targets;
     if (effectHandleMode == SPELL_EFFECT_HANDLE_LAUNCH_TARGET)
     {
-        if (!spellInfo->NeedsToBeTriggeredByCaster())
+        if (!spellInfo->NeedsToBeTriggeredByCaster(m_spellInfo))
             return;
         targets.SetUnitTarget(unitTarget);
     }
     else //if (effectHandleMode == SPELL_EFFECT_HANDLE_LAUNCH)
     {
-        if (spellInfo->NeedsToBeTriggeredByCaster() && (m_spellInfo->Effects[effIndex].GetProvidedTargetMask() & TARGET_FLAG_UNIT_MASK))
+        if (spellInfo->NeedsToBeTriggeredByCaster(m_spellInfo) && (m_spellInfo->Effects[effIndex].GetProvidedTargetMask() & TARGET_FLAG_UNIT_MASK))
             return;
 
         if (spellInfo->GetExplicitTargetMask() & TARGET_FLAG_DEST_LOCATION)
@@ -971,13 +969,13 @@ void Spell::EffectTriggerMissileSpell(SpellEffIndex effIndex)
     SpellCastTargets targets;
     if (effectHandleMode == SPELL_EFFECT_HANDLE_HIT_TARGET)
     {
-        if (!spellInfo->NeedsToBeTriggeredByCaster())
+        if (!spellInfo->NeedsToBeTriggeredByCaster(m_spellInfo))
             return;
         targets.SetUnitTarget(unitTarget);
     }
     else //if (effectHandleMode == SPELL_EFFECT_HANDLE_HIT)
     {
-        if (spellInfo->NeedsToBeTriggeredByCaster() && (m_spellInfo->Effects[effIndex].GetProvidedTargetMask() & TARGET_FLAG_UNIT_MASK))
+        if (spellInfo->NeedsToBeTriggeredByCaster(m_spellInfo) && (m_spellInfo->Effects[effIndex].GetProvidedTargetMask() & TARGET_FLAG_UNIT_MASK))
             return;
 
         if (spellInfo->GetExplicitTargetMask() & TARGET_FLAG_DEST_LOCATION)
@@ -1035,6 +1033,9 @@ void Spell::EffectForceCast(SpellEffIndex effIndex)
             case 52463: // Hide In Mine Car
             case 52349: // Overtake
                 unitTarget->CastCustomSpell(unitTarget, spellInfo->Id, &damage, NULL, NULL, true, NULL, NULL, m_originalCasterGUID);
+                return;
+            case 72299: // Malleable Goo Summon Trigger
+                unitTarget->CastSpell(unitTarget, spellInfo->Id, true, NULL, NULL, m_originalCasterGUID);
                 return;
         }
     }
@@ -1131,29 +1132,6 @@ void Spell::EffectTeleportUnits(SpellEffIndex /*effIndex*/)
 
     if (!unitTarget || unitTarget->IsInFlight())
         return;
-
-    // Pre effects
-    switch (m_spellInfo->Id)
-    {
-        case 66550: // teleports outside (Isle of Conquest)
-            if (Player* target = unitTarget->ToPlayer())
-            {
-                if (target->GetTeamId() == TEAM_ALLIANCE)
-                    m_targets.SetDst(442.24f, -835.25f, 44.30f, 0.06f, 628);
-                else
-                    m_targets.SetDst(1120.43f, -762.11f, 47.92f, 2.94f, 628);
-            }
-            break;
-        case 66551: // teleports inside (Isle of Conquest)
-            if (Player* target = unitTarget->ToPlayer())
-            {
-                if (target->GetTeamId() == TEAM_ALLIANCE)
-                    m_targets.SetDst(389.57f, -832.38f, 48.65f, 3.00f, 628);
-                else
-                    m_targets.SetDst(1174.85f, -763.24f, 48.72f, 6.26f, 628);
-            }
-            break;
-    }
 
     // If not exist data for dest location - return
     if (!m_targets.HasDst())
@@ -1338,7 +1316,7 @@ void Spell::EffectPowerDrain(SpellEffIndex effIndex)
 
     float gainMultiplier = 0.0f;
 
-    // Don`t restore from self drain
+    // Don't restore from self drain
     if (m_caster != unitTarget)
     {
         gainMultiplier = m_spellInfo->Effects[effIndex].CalcValueMultiplier(m_originalCaster, this);
@@ -3901,15 +3879,6 @@ void Spell::EffectScriptEffect(SpellEffIndex effIndex)
                     npc->LoadEquipment();
                     return;
                 }
-                // Emblazon Runeblade
-                case 51770:
-                {
-                    if (!m_originalCaster)
-                        return;
-
-                    m_originalCaster->CastSpell(m_originalCaster, damage, false);
-                    break;
-                }
                 // Deathbolt from Thalgran Blightbringer
                 // reflected by Freya's Ward
                 // Retribution by Sevenfold Retribution
@@ -3984,26 +3953,6 @@ void Spell::EffectScriptEffect(SpellEffIndex effIndex)
 
                     return;
                 }
-                case 58941:                                 // Rock Shards
-                    if (unitTarget && m_originalCaster)
-                    {
-                        for (uint32 i = 0; i < 3; ++i)
-                        {
-                            m_originalCaster->CastSpell(unitTarget, 58689, true);
-                            m_originalCaster->CastSpell(unitTarget, 58692, true);
-                        }
-                        if (((InstanceMap*)m_originalCaster->GetMap())->GetDifficulty() == REGULAR_DIFFICULTY)
-                        {
-                            m_originalCaster->CastSpell(unitTarget, 58695, true);
-                            m_originalCaster->CastSpell(unitTarget, 58696, true);
-                        }
-                        else
-                        {
-                            m_originalCaster->CastSpell(unitTarget, 60883, true);
-                            m_originalCaster->CastSpell(unitTarget, 60884, true);
-                        }
-                    }
-                    return;
                 case 58983: // Big Blizzard Bear
                 {
                     if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
@@ -4114,14 +4063,6 @@ void Spell::EffectScriptEffect(SpellEffIndex effIndex)
                         basepoints0 *= aur->GetAmount();
                         m_caster->CastCustomSpell(unitTarget, 55277, &basepoints0, NULL, NULL, true);
                     }
-                    break;
-                }
-                case 66545: //Summon Memory
-                {
-                    uint8 uiRandom = urand(0, 25);
-                    uint32 uiSpells[26] = {66704, 66705, 66706, 66707, 66709, 66710, 66711, 66712, 66713, 66714, 66715, 66708, 66708, 66691, 66692, 66694, 66695, 66696, 66697, 66698, 66699, 66700, 66701, 66702, 66703, 66543};
-
-                    m_caster->CastSpell(m_caster, uiSpells[uiRandom], true);
                     break;
                 }
                 case 45668:                                 // Ultra-Advanced Proto-Typical Shortening Blaster
