@@ -73,6 +73,7 @@
 #include "CharacterDatabaseCleaner.h"
 #include "ScriptMgr.h"
 #include "WeatherMgr.h"
+#include "AuctionHouseBot.h"
 #include "CreatureTextMgr.h"
 #include "SmartAI.h"
 #include "Channel.h"
@@ -92,7 +93,11 @@ float World::m_MaxVisibleDistanceInBGArenas   = DEFAULT_VISIBILITY_BGARENAS;
 int32 World::m_visibility_notify_periodOnContinents = DEFAULT_VISIBILITY_NOTIFY_PERIOD;
 int32 World::m_visibility_notify_periodInInstances  = DEFAULT_VISIBILITY_NOTIFY_PERIOD;
 int32 World::m_visibility_notify_periodInBGArenas   = DEFAULT_VISIBILITY_NOTIFY_PERIOD;
-
+// movement anticheat
+bool World::m_EnableMvAnticheat = true;
+uint32 World::m_TeleportToPlaneAlarms = 50;
+uint32 World::m_MistimingAlarms = 200;
+uint32 World::m_MistimingDelta = 15000;
 /// World constructor
 World::World()
 {
@@ -562,6 +567,41 @@ void World::LoadConfigSettings(bool reload)
     {
         TC_LOG_ERROR(LOG_FILTER_SERVER_LOADING, "DurabilityLossChance.Block (%f) must be >=0. Using 0.0 instead.", rate_values[RATE_DURABILITY_LOSS_BLOCK]);
         rate_values[RATE_DURABILITY_LOSS_BLOCK] = 0.0f;
+    }
+    // movement anticheat
+    m_EnableMvAnticheat = sConfigMgr->GetBoolDefault("Anticheat.Movement.Enable", true);
+    m_TeleportToPlaneAlarms = sConfigMgr->GetIntDefault("Anticheat.Movement.TeleportToPlaneAlarms", 50);
+    if (m_TeleportToPlaneAlarms < 20)
+    {
+        sLog->outError(LOG_FILTER_SERVER_LOADING, "Anticheat.Movement.TeleportToPlaneAlarms (%d) must be >= 20. Using 20 instead.", m_TeleportToPlaneAlarms);
+        m_TeleportToPlaneAlarms = 20;
+    }
+    if (m_TeleportToPlaneAlarms > 100)
+    {
+        sLog->outError(LOG_FILTER_SERVER_LOADING, "Anticheat.Movement.TeleportToPlaneAlarms (%d) must be <= 100. Using 100 instead.", m_TeleportToPlaneAlarms);
+        m_TeleportToPlaneAlarms = 100;
+    }
+    m_MistimingDelta = sConfigMgr->GetIntDefault("Anticheat.Movement.MistimingDelta", 15000);
+    if (m_MistimingDelta < 5000)
+    {
+        sLog->outError(LOG_FILTER_SERVER_LOADING, "Anticheat.Movement.m_MistimingDelta (%d) must be >= 5000ms. Using 5000ms instead.", m_MistimingDelta);
+        m_MistimingDelta = 5000;
+    }
+    if (m_MistimingDelta > 50000)
+    {
+        sLog->outError(LOG_FILTER_SERVER_LOADING, "Anticheat.Movement.m_MistimingDelta (%d) must be <= 50000ms. Using 50000ms instead.", m_MistimingDelta);
+        m_MistimingDelta = 50000;
+    }
+    m_MistimingAlarms = sConfigMgr->GetIntDefault("Anticheat.Movement.MistimingAlarms", 200);
+    if (m_MistimingAlarms < 100)
+    {
+        sLog->outError(LOG_FILTER_SERVER_LOADING, "Anticheat.Movement.MistimingAlarms (%d) must be >= 100. Using 100 instead.", m_MistimingAlarms);
+        m_MistimingAlarms = 100;
+    }
+    if (m_MistimingAlarms > 500)
+    {
+        sLog->outError(LOG_FILTER_SERVER_LOADING, "Anticheat.Movement.m_MistimingAlarms (%d) must be <= 500. Using 500 instead.", m_MistimingAlarms);
+        m_MistimingAlarms = 500;
     }
     ///- Read other configuration items from the config file
 
@@ -1227,6 +1267,21 @@ void World::LoadConfigSettings(bool reload)
     m_bool_configs[CONFIG_PDUMP_NO_OVERWRITE] = sConfigMgr->GetBoolDefault("PlayerDump.DisallowOverwrite", true);
     m_bool_configs[CONFIG_UI_QUESTLEVELS_IN_DIALOGS] = sConfigMgr->GetBoolDefault("UI.ShowQuestLevelsInDialogs", false);
 
+	m_int_configs[VAS_VasDebug] = sConfigMgr->GetIntDefault ("VAS.AutoBalance.Debug", 1);
+    m_int_configs[VAS_AutoInstance] = sConfigMgr->GetIntDefault ("VAS.AutoBalance.AutoInstance", 1);
+    m_int_configs[VAS_PlayerChangeNotify] = sConfigMgr->GetIntDefault ("VAS.AutoBalance.PlayerChangeNotify", 1);
+
+    m_float_configs[VAS_Config_xPlayer] = sConfigMgr->GetFloatDefault("VAS.AutoBalance.XPlayer", 1.0f);
+    m_float_configs[VAS_Min_D_Mod] = sConfigMgr->GetFloatDefault("Min.D.Mod", 0.10f);
+    m_float_configs[VAS_Min_HP_Mod] = sConfigMgr->GetFloatDefault("Min.HP.Mod", 0.20f);
+
+    std::string VAS_AutoBalance_40_Name = sConfigMgr->GetStringDefault("VAS.AutoBalance.40.Name", "");
+    std::string VAS_AutoBalance_25_Name = sConfigMgr->GetStringDefault("VAS.AutoBalance.25.Name", "");
+    std::string VAS_AutoBalance_20_Name = sConfigMgr->GetStringDefault("VAS.AutoBalance.20.Name", "");
+    std::string VAS_AutoBalance_10_Name = sConfigMgr->GetStringDefault("VAS.AutoBalance.10.Name", "");
+    std::string VAS_AutoBalance_5_Name = sConfigMgr->GetStringDefault("VAS.AutoBalance.5.Name", "");
+    std::string VAS_AutoBalance_2_Name = sConfigMgr->GetStringDefault("VAS.AutoBalance.2.Name", "");
+
     // Wintergrasp battlefield
     m_bool_configs[CONFIG_WINTERGRASP_ENABLE] = sConfigMgr->GetBoolDefault("Wintergrasp.Enable", false);
     m_int_configs[CONFIG_WINTERGRASP_PLR_MAX] = sConfigMgr->GetIntDefault("Wintergrasp.PlayerMax", 100);
@@ -1816,6 +1871,12 @@ void World::SetInitialWorldSettings()
 
     LoadCharacterNameData();
 
+	TC_LOG_INFO(LOG_FILTER_SERVER_LOADING, "Loading VAS Autobalance...");
+	sScriptMgr->SetInitialWorldSettings();
+
+    sLog->outInfo(LOG_FILTER_SERVER_LOADING, "Initialize AuctionHouseBot...");
+    auctionbot.Initialize();
+
     uint32 startupDuration = GetMSTimeDiffToNow(startupBegin);
 
     TC_LOG_INFO(LOG_FILTER_WORLDSERVER, "World initialized in %u minutes %u seconds", (startupDuration / 60000), ((startupDuration % 60000) / 1000));
@@ -1983,6 +2044,7 @@ void World::Update(uint32 diff)
     /// <ul><li> Handle auctions when the timer has passed
     if (m_timers[WUPDATE_AUCTIONS].Passed())
     {
+        auctionbot.Update();
         m_timers[WUPDATE_AUCTIONS].Reset();
 
         ///- Update mails (return old mails with item, or delete them)
