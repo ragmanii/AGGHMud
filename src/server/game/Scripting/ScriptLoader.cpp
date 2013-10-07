@@ -17,19 +17,6 @@
 
 #include "ScriptLoader.h"
 
-//---------------------//
-//       Custom       //
-//--------------------//
-
-//Vas AutoBalance
-void AddSC_VAS_AutoBalance();
-
-
-
-//---------------------//
-//    End Custom       //
-//--------------------//
-
 //examples
 void AddSC_example_creature();
 void AddSC_example_escort();
@@ -60,7 +47,6 @@ void AddSC_SmartSCripts();
 void AddSC_account_commandscript();
 void AddSC_achievement_commandscript();
 void AddSC_arena_commandscript();
-void AddSC_ah_bot_commandscript();
 void AddSC_ban_commandscript();
 void AddSC_bf_commandscript();
 void AddSC_cast_commandscript();
@@ -745,7 +731,6 @@ void AddCommandScripts()
     AddSC_account_commandscript();
     AddSC_achievement_commandscript();
     AddSC_arena_commandscript();
-    AddSC_ah_bot_commandscript();
     AddSC_ban_commandscript();
     AddSC_bf_commandscript();
     AddSC_cast_commandscript();
@@ -1409,17 +1394,6 @@ void AddBattlegroundScripts()
 
 #ifdef SCRIPTS
 /* This is where custom scripts' loading functions should be declared. */
-//Bots
-void AddSC_druid_bot();
-void AddSC_hunter_bot();
-void AddSC_mage_bot();
-void AddSC_paladin_bot();
-void AddSC_priest_bot();
-void AddSC_rogue_bot();
-void AddSC_shaman_bot();
-void AddSC_warlock_bot();
-void AddSC_warrior_bot();
-void AddSC_script_bot_commands();
 
 #endif
 
@@ -1427,21 +1401,6 @@ void AddCustomScripts()
 {
 #ifdef SCRIPTS
     /* This is where custom scripts should be added. */
-    //Bots
-    AddSC_druid_bot();
-    AddSC_hunter_bot();
-    AddSC_mage_bot();
-    AddSC_paladin_bot();
-    AddSC_priest_bot();
-    AddSC_rogue_bot();
-    AddSC_shaman_bot();
-    AddSC_warlock_bot();
-    AddSC_warrior_bot();
-    AddSC_script_bot_commands();
-
-	//VAS AutoBalance
-
-	AddSC_VAS_AutoBalance();
 
 #endif
 }

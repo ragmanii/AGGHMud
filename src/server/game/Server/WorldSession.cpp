@@ -115,6 +115,7 @@ WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8
     m_sessionDbcLocale(sWorld->GetAvailableDbcLocale(locale)),
     m_sessionDbLocaleIndex(locale),
     m_latency(0),
+    m_clientTimeDelay(0),
     m_TutorialsChanged(false),
     recruiterId(recruiter),
     isRecruiter(isARecruiter),
@@ -418,20 +419,6 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 /// %Log the player out
 void WorldSession::LogoutPlayer(bool save)
 {
-    uint8 nBotCount = 0;
-    if (_player)
-    {
-        //remove npcbots but do not delete from DB so they can be reacqured on next login
-        for (uint8 i = 0; i != _player->GetMaxNpcBots(); ++i)
-        {
-            if (_player->GetBotMap(i)->_Guid())
-            {
-                _player->RemoveBot(_player->GetBotMap(i)->_Guid(), true, false);
-                ++nBotCount;
-            }
-        }
-    }
-
     // finish pending transfers before starting the logout
     while (_player && _player->IsBeingTeleportedFar())
         HandleMoveWorldportAckOpcode();
@@ -525,9 +512,6 @@ void WorldSession::LogoutPlayer(bool save)
         // remove player from the group if he is:
         // a) in group; b) not in raid group; c) logging out normally (not being kicked or disconnected)
         if (_player->GetGroup() && !_player->GetGroup()->isRaidGroup() && m_Socket)
-            //bot d) if has no NpcBots or not in instance (trying to save instance)
-            if (nBotCount == 0 || !_player->GetMap()->Instanceable())
-            //end bot
             _player->RemoveFromGroup();
 
         //! Send update to group and reset stored max enchanting level
@@ -1205,15 +1189,16 @@ void WorldSession::LoadPermissions()
     uint32 id = GetAccountId();
     std::string name;
     AccountMgr::GetName(id, name);
+    uint8 secLevel = GetSecurity();
 
-    _RBACData = new RBACData(id, name, realmID);
+    _RBACData = new rbac::RBACData(id, name, realmID, secLevel);
     _RBACData->LoadFromDB();
 
-    TC_LOG_DEBUG(LOG_FILTER_RBAC, "WorldSession::LoadPermissions [AccountId: %u, Name: %s, realmId: %d]",
-                   id, name.c_str(), realmID);
+    TC_LOG_DEBUG(LOG_FILTER_RBAC, "WorldSession::LoadPermissions [AccountId: %u, Name: %s, realmId: %d, secLevel: %u]",
+                   id, name.c_str(), realmID, secLevel);
 }
 
-RBACData* WorldSession::GetRBACData()
+rbac::RBACData* WorldSession::GetRBACData()
 {
     return _RBACData;
 }
@@ -1232,7 +1217,7 @@ bool WorldSession::HasPermission(uint32 permission)
 
 void WorldSession::InvalidateRBACData()
 {
-    TC_LOG_DEBUG(LOG_FILTER_RBAC, "WorldSession::InvalidateRBACData [AccountId: %u, Name: %s, realmId: %d]",
+    TC_LOG_DEBUG(LOG_FILTER_RBAC, "WorldSession::Invalidaterbac::RBACData [AccountId: %u, Name: %s, realmId: %d]",
                    _RBACData->GetId(), _RBACData->GetName().c_str(), realmID);
     delete _RBACData;
     _RBACData = NULL;

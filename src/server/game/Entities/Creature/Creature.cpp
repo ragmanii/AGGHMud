@@ -54,9 +54,6 @@
 
 // apply implementation of the singletons
 
-// npcbot
-#include "bot_ai.h"
-
 TrainerSpell const* TrainerSpellData::Find(uint32 spell_id) const
 {
     TrainerSpellMap::const_iterator itr = spellList.find(spell_id);
@@ -168,13 +165,7 @@ m_creatureInfo(NULL), m_creatureData(NULL), m_path_id(0), m_formation(NULL)
     ResetLootMode(); // restore default loot mode
     TriggerJustRespawned = false;
     m_isTempWorldObject = false;
-
-    //bot
-    m_bot_owner = NULL;
-    m_creature_owner = NULL;
-    m_bots_pet = NULL;
-    m_bot_class = CLASS_NONE;
-    bot_AI = NULL;
+    _focusSpell = NULL;
 }
 
 Creature::~Creature()
@@ -242,8 +233,6 @@ void Creature::SearchFormation()
 void Creature::RemoveCorpse(bool setSpawnTime)
 {
     if (getDeathState() != CORPSE)
-        return;
-    if (bot_AI)
         return;
 
     m_corpseRemoveTime = time(NULL);
@@ -1083,8 +1072,6 @@ void Creature::SelectLevel(const CreatureTemplate* cinfo)
 
     SetModifierValue(UNIT_MOD_ATTACK_POWER, BASE_VALUE, cinfo->attackpower * damagemod);
 
-	sScriptMgr->Creature_SelectLevel(cinfo, this);
-
 }
 
 float Creature::_GetHealthMod(int32 Rank)
@@ -1723,7 +1710,7 @@ SpellInfo const* Creature::reachWithSpellCure(Unit* victim)
 }
 
 // select nearest hostile unit within the given distance (regardless of threat list).
-Unit* Creature::SelectNearestTarget(float dist) const
+Unit* Creature::SelectNearestTarget(float dist, bool playerOnly /* = false */) const
 {
     CellCoord p(Trinity::ComputeCellCoord(GetPositionX(), GetPositionY()));
     Cell cell(p);
@@ -1735,7 +1722,7 @@ Unit* Creature::SelectNearestTarget(float dist) const
         if (dist == 0.0f)
             dist = MAX_VISIBILITY_DISTANCE;
 
-        Trinity::NearestHostileUnitCheck u_check(this, dist);
+        Trinity::NearestHostileUnitCheck u_check(this, dist, playerOnly);
         Trinity::UnitLastSearcher<Trinity::NearestHostileUnitCheck> searcher(this, target, u_check);
 
         TypeContainerVisitor<Trinity::UnitLastSearcher<Trinity::NearestHostileUnitCheck>, WorldTypeMapContainer > world_unit_searcher(searcher);
@@ -2655,124 +2642,40 @@ void Creature::SetDisplayId(uint32 modelId)
     }
 }
 
-void Creature::SetIAmABot(bool bot)
+void Creature::SetTarget(uint64 guid)
 {
-    if (!bot)
-    {
-        bot_AI->UnsummonAll();
-        IsAIEnabled = false;
-        bot_AI = NULL;
-        SetUInt64Value(UNIT_FIELD_CREATEDBY, 0);
-    }
+    if (!_focusSpell)
+        SetUInt64Value(UNIT_FIELD_TARGET, guid);
 }
 
-void Creature::SetBotsPetDied()
+void Creature::FocusTarget(Spell const* focusSpell, WorldObject const* target)
 {
-    if (!m_bots_pet)
+    // already focused
+    if (_focusSpell)
         return;
-    m_bots_pet->SetCharmerGUID(0);
-    m_bots_pet->SetCreatureOwner(NULL);
-    //m_bots_pet->GetBotPetAI()->SetCreatureOwner(NULL);
-    m_bots_pet->SetIAmABot(false);
-    m_bot_owner->SetMinion((Minion*)m_bots_pet, false);
-    m_bots_pet->CleanupsBeforeDelete();
-    m_bots_pet->AddObjectToRemoveList();
-    m_bots_pet = NULL;
+
+    _focusSpell = focusSpell;
+    SetUInt64Value(UNIT_FIELD_TARGET, target->GetGUID());
+    if (focusSpell->GetSpellInfo()->AttributesEx5 & SPELL_ATTR5_DONT_TURN_DURING_CAST)
+        AddUnitState(UNIT_STATE_ROTATING);
+
+    // Set serverside orientation if needed (needs to be after attribute check)
+    SetInFront(target);
 }
 
-void Creature::SetBotTank(Unit* newtank)
+void Creature::ReleaseFocus(Spell const* focusSpell)
 {
-    if (!bot_AI || !IsAIEnabled)
+    // focused to something else
+    if (focusSpell != _focusSpell)
         return;
-    uint64 tankGuid = bot_AI->GetBotTankGuid();
-    if (newtank && newtank->GetGUID() == tankGuid) return;
-    Creature* oldtank = tankGuid && IS_CREATURE_GUID(tankGuid) ? sObjectAccessor->GetObjectInWorld(tankGuid, (Creature* )NULL) : NULL;
-    if (oldtank && oldtank->IsInWorld() && (oldtank->GetIAmABot() || oldtank->GetIAmABotsPet()))
-    {
-        oldtank->RemoveAurasDueToSpell(DEFENSIVE_STANCE_PASSIVE);
-        uint8 ClassOrPetType = oldtank->GetIAmABotsPet() ? bot_pet_ai::GetPetType(oldtank) : oldtank->GetBotClass();
-        oldtank->GetBotAI()->ApplyPassives(ClassOrPetType);
-    }
-    if (newtank == this)
-    {
-        for (uint8 i = 0; i < 3; ++i)
-            AddAura(DEFENSIVE_STANCE_PASSIVE, this);
-        if (Player* owner = m_bot_owner)
-        {
-            switch (urand(1,5))
-            {
-            case 1: MonsterWhisper("I am tank here!", owner->GetGUID()); break;
-            case 2: MonsterWhisper("I will tank now.", owner->GetGUID()); break;
-            case 3: MonsterWhisper("I gonna tank", owner->GetGUID()); break;
-            case 4: MonsterWhisper("I think I will be best tank here...", owner->GetGUID()); break;
-            case 5: MonsterWhisper("I AM the tank!", owner->GetGUID()); break;
-            }
-        }
-        bot_AI->UpdateHealth();
-        if (!IsInCombat())
-            SetBotCommandState(COMMAND_FOLLOW, true);
-    }
-    bot_AI->SetBotTank(newtank);
-}
 
-void Creature::SetBotCommandState(CommandStates st, bool force)
-{
-    if (bot_AI && IsAIEnabled)
-        bot_AI->SetBotCommandState(st, force);
-}
-//Bot damage mods
-void Creature::ApplyBotDamageMultiplierMelee(uint32& damage, CalcDamageInfo& damageinfo) const
-{
-    if (bot_AI)
-        bot_AI->ApplyBotDamageMultiplierMelee(damage, damageinfo);
-}
-void Creature::ApplyBotDamageMultiplierMelee(int32& damage, SpellNonMeleeDamage& damageinfo, SpellInfo const* spellInfo, WeaponAttackType attackType, bool& crit) const
-{
-    if (bot_AI)
-        bot_AI->ApplyBotDamageMultiplierMelee(damage, damageinfo, spellInfo, attackType, crit);
-}
-void Creature::ApplyBotDamageMultiplierSpell(int32& damage, SpellNonMeleeDamage& damageinfo, SpellInfo const* spellInfo, WeaponAttackType attackType, bool& crit) const
-{
-    if (bot_AI)
-        bot_AI->ApplyBotDamageMultiplierSpell(damage, damageinfo, spellInfo, attackType, crit);
-}
-
-bool Creature::GetIAmABot() const
-{
-    return bot_AI ? bot_AI->IsMinionAI() : false;
-}
-
-bool Creature::GetIAmABotsPet() const
-{
-    return bot_AI ? bot_AI->IsPetAI() : false;
-}
-
-bot_minion_ai* Creature::GetBotMinionAI() const
-{
-    return IsAIEnabled && bot_AI && bot_AI->IsMinionAI() ? const_cast<bot_minion_ai*>(bot_AI->GetMinionAI()) : NULL;
-}
-
-bot_pet_ai* Creature::GetBotPetAI() const
-{
-    return IsAIEnabled && bot_AI && bot_AI->IsPetAI() ? const_cast<bot_pet_ai*>(bot_AI->GetPetAI()) : NULL;
-}
-
-void Creature::InitBotAI(bool asPet)
-{
-    ASSERT(!bot_AI);
-
-    if (asPet)
-        bot_AI = (bot_pet_ai*)AI();
+    _focusSpell = NULL;
+    if (Unit* victim = GetVictim())
+        SetUInt64Value(UNIT_FIELD_TARGET, victim->GetGUID());
     else
-        bot_AI = (bot_minion_ai*)AI();
+        SetUInt64Value(UNIT_FIELD_TARGET, 0);
+
+    if (focusSpell->GetSpellInfo()->AttributesEx5 & SPELL_ATTR5_DONT_TURN_DURING_CAST)
+        ClearUnitState(UNIT_STATE_ROTATING);
 }
 
-void Creature::SetBotShouldUpdateStats()
-{
-    if (bot_AI) bot_AI->SetShouldUpdateStats();
-}
-
-void Creature::OnBotSummon(Creature* summon)
-{
-    if (bot_AI) bot_AI->OnBotSummon(summon);
-}
