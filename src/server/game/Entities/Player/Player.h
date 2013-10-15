@@ -52,6 +52,11 @@ class PlayerSocial;
 class SpellCastTargets;
 class UpdateMask;
 
+// NpcBot mod
+struct NpcBotMap;
+#define MAX_NPCBOTS 40
+class BotHelper;
+
 typedef std::deque<Mail*> PlayerMails;
 
 #define PLAYER_MAX_SKILLS           127
@@ -2293,6 +2298,39 @@ class Player : public Unit, public GridObject<Player>
         //! Return collision height sent to client
         float GetCollisionHeight(bool mounted) const;
 
+        /*********************************************************/
+        /***                     BOT SYSTEM                    ***/
+        /*********************************************************/
+        void SetBotHelper(BotHelper* hlpr) { ASSERT (!_botHlpr); _botHlpr = hlpr; }
+        BotHelper* GetBotHelper() const { return _botHlpr; }
+        void RefreshBot(uint32 p_time);
+        void CreateBot(uint32 botentry, uint8 botrace, uint8 botclass, bool istank = false, bool revive = false);
+        void CreateNPCBot(uint8 botclass);
+        uint8 GetNpcBotSlot(uint64 guid) const;
+        void SendBotCommandState(Creature* cre, CommandStates state);
+        bool HaveBot() const;
+        void RemoveBot(uint64 guid, bool final = false, bool eraseFromDB = true);
+        void SetBot(Creature* cre) { m_bot = cre; }
+        uint8 GetNpcBotsCount() const;
+        void SetBotMustBeCreated(uint32 m_entry, uint8 m_race, uint8 m_class, bool istank = false);
+        void ClearBotMustBeCreated(uint64 value, bool guid = true, bool fully = false);
+        bool GetBotMustBeCreated();
+        uint64 GetBotTankGuid() const { return m_botTankGuid; }
+        void SetBotTank(uint64 guid);
+        Unit* GetBotTank(uint32 entry);
+        uint8 GetBotFollowDist() const { return m_followdist; }
+        void SetBotFollowDist(int8 dist) { m_followdist = dist; }
+        void SetNpcBotDied(uint64 guid);
+        NpcBotMap const* GetBotMap(uint8 pos) const { return m_botmap[pos]; }
+        uint8 GetMaxNpcBots() const;
+        uint8 GetNpcBotXpReduction() const { return m_xpReductionNpcBots; }
+        bool RestrictBots() const;
+        uint32 GetNpcBotCost() const;
+        std::string GetNpcBotCostStr() const;
+        /*********************************************************/
+        /***                 END BOT SYSTEM                    ***/
+        /*********************************************************/
+
         std::string GetMapAreaAndZoneString();
         std::string GetCoordsMapAreaAndZoneString();
 
@@ -2520,6 +2558,26 @@ class Player : public Unit, public GridObject<Player>
         float m_rest_bonus;
         RestType rest_type;
         ////////////////////Rest System/////////////////////
+        // movement anticheat
+        time_t m_anti_LastClientTime;           // last movement client time
+        time_t m_anti_LastServerTime;           // last movement server time
+        time_t m_anti_DeltaClientTime;          // client side session time
+        time_t m_anti_DeltaServerTime;          // server side session time
+        uint32 m_anti_MistimingCount;           // mistiming count
+
+        time_t m_anti_LastSpeedChangeTime;      // last speed change time
+
+        float m_anti_Last_HSpeed;               // horizontal speed, default RUN speed
+        float m_anti_Last_VSpeed;               // vertical speed, default max jump height
+
+        uint32 m_anti_TeleToPlane_Count;        // Teleport To Plane alarm counter
+
+        uint64 m_anti_AlarmCount;               // alarm counter
+
+        uint16 m_anti_JumpCount;                // Jump already began, anti air jump check
+        float m_anti_JumpBaseZ;                 // Z coord before jump
+        // end movement anticheat
+
         uint32 m_resetTalentsCost;
         time_t m_resetTalentsTime;
         uint32 m_usedTalentCount;
@@ -2557,6 +2615,31 @@ class Player : public Unit, public GridObject<Player>
         uint8 m_grantableLevels;
 
     private:
+        /*********************************************************/
+        /***                     BOT SYSTEM                    ***/
+        /*********************************************************/
+        BotHelper* _botHlpr;
+        Creature* m_bot;
+        int8 m_followdist;
+        uint64 m_botTankGuid;
+        uint8 m_maxNpcBots;
+        uint8 m_maxClassNpcBots;
+        uint8 m_xpReductionNpcBots;
+        bool m_enableNpcBots;
+        bool m_enableAllNpcBots;
+        bool m_enableNpcBotsArenas;
+        bool m_enableNpcBotsBGs;
+        bool m_enableNpcBotsDungeons;
+        bool m_enableNpcBotsRaids;
+        bool m_limitNpcBotsDungeons;
+        bool m_limitNpcBotsRaids;
+        uint32 m_NpcBotsCost;
+        uint32 m_botTimer;
+        NpcBotMap* m_botmap[MAX_NPCBOTS];
+        /*********************************************************/
+        /***                END BOT SYSTEM                     ***/
+        /*********************************************************/
+
         // internal common parts for CanStore/StoreItem functions
         InventoryResult CanStoreItem_InSpecificSlot(uint8 bag, uint8 slot, ItemPosCountVec& dest, ItemTemplate const* pProto, uint32& count, bool swap, Item* pSrcItem) const;
         InventoryResult CanStoreItem_InBag(uint8 bag, ItemPosCountVec& dest, ItemTemplate const* pProto, uint32& count, bool merge, bool non_specialized, Item* pSrcItem, uint8 skip_bag, uint8 skip_slot) const;
