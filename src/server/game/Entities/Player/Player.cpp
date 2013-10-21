@@ -993,9 +993,6 @@ void Player::CleanupsBeforeDelete(bool finalCleanup)
 
     Unit::CleanupsBeforeDelete(finalCleanup);
 
-    if (m_transport)
-        m_transport->RemovePassenger(this);
-
     // clean up player-instance binds, may unload some instance saves
     for (uint8 i = 0; i < MAX_DIFFICULTY; ++i)
         for (BoundInstancesMap::iterator itr = m_boundInstances[i].begin(); itr != m_boundInstances[i].end(); ++itr)
@@ -2386,10 +2383,13 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
 
             if (m_transport)
             {
-                final_x += m_movementInfo.transport.pos.GetPositionX();
-                final_y += m_movementInfo.transport.pos.GetPositionY();
-                final_z += m_movementInfo.transport.pos.GetPositionZ();
-                final_o += m_movementInfo.transport.pos.GetOrientation();
+                float tx, ty, tz, to;
+                m_movementInfo.transport.pos.GetPosition(tx, ty, tz, to);
+
+                final_x = x + tx * std::cos(orientation) - ty * std::sin(orientation);
+                final_y = y + ty * std::cos(orientation) + tx * std::sin(orientation);
+                final_z = z + tz;
+                final_o = Position::NormalizeOrientation(orientation + m_movementInfo.transport.pos.GetOrientation());
             }
 
             m_teleport_dest = WorldLocation(mapid, final_x, final_y, final_z, final_o);
@@ -18057,17 +18057,15 @@ bool Player::LoadFromDB(uint32 guid, SQLQueryHolder *holder)
         }
         else
         {
-            for (MapManager::TransportSet::iterator iter = sMapMgr->m_Transports.begin(); iter != sMapMgr->m_Transports.end(); ++iter)
+            if (GameObject* go = HashMapHolder<GameObject>::Find(m_movementInfo.transport.guid))
+                m_transport = go->ToTransport();
+
+            if (m_transport)
             {
-                if ((*iter)->GetGUIDLow() == transGUID)
-                {
-                    m_transport = *iter;
-                    m_transport->AddPassenger(this);
-                    mapId = (m_transport->GetMapId());
-                    break;
-                }
+                m_transport->AddPassenger(this);
+                mapId = m_transport->GetMapId();
             }
-            if (!m_transport)
+            else
             {
                 TC_LOG_ERROR(LOG_FILTER_PLAYER, "Player (guidlow %d) have problems with transport guid (%u). Teleport to bind location.",
                     guid, transGUID);
@@ -23040,7 +23038,7 @@ inline void UpdateVisibilityOf_helper(std::set<uint64>& s64, T* target, std::set
 template<>
 inline void UpdateVisibilityOf_helper(std::set<uint64>& s64, GameObject* target, std::set<Unit*>& /*v*/)
 {
-    // Don't update only GAMEOBJECT_TYPE_TRANSPORT (or all transports and destructible buildings?)
+    // @HACK: This is to prevent objects like deeprun tram from disappearing when player moves far from its spawn point while riding it
     if ((target->GetGOInfo()->type != GAMEOBJECT_TYPE_TRANSPORT))
         s64.insert(target->GetGUID());
 }
@@ -23092,9 +23090,6 @@ void Player::UpdateVisibilityOf(WorldObject* target)
     {
         if (CanSeeOrDetect(target, false, true))
         {
-            //if (target->isType(TYPEMASK_UNIT) && ((Unit*)target)->m_Vehicle)
-            //    UpdateVisibilityOf(((Unit*)target)->m_Vehicle);
-
             target->SendUpdateToPlayer(this);
             m_clientGUIDs.insert(target->GetGUID());
 
@@ -23183,9 +23178,6 @@ void Player::UpdateVisibilityOf(T* target, UpdateData& data, std::set<Unit*>& vi
     {
         if (CanSeeOrDetect(target, false, true))
         {
-            //if (target->isType(TYPEMASK_UNIT) && ((Unit*)target)->m_Vehicle)
-            //    UpdateVisibilityOf(((Unit*)target)->m_Vehicle, data, visibleNow);
-
             target->BuildCreateUpdateBlockForPlayer(&data, this);
             UpdateVisibilityOf_helper(m_clientGUIDs, target, visibleNow);
 
