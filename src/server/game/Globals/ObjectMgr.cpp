@@ -5501,8 +5501,7 @@ void ObjectMgr::LoadAreaTriggerScripts()
     TC_LOG_INFO(LOG_FILTER_SERVER_LOADING, ">> Loaded %u areatrigger scripts in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-// use searched_node for search some known node
-uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid, uint32 team, uint32 searched_node)
+uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid, uint32 team)
 {
     bool found = false;
     float dist = 10000;
@@ -5512,18 +5511,7 @@ uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid, ui
     {
         TaxiNodesEntry const* node = sTaxiNodesStore.LookupEntry(i);
 
-        if (!node || node->map_id != mapid) continue;
-
-        const float dist2 = pow(node->x - x, 2) + pow(node->y - y, 2) + pow(node->z - z, 2);
-
-        if (searched_node != 0 && i == searched_node)
-        {
-            id = i;
-            dist = dist2;
-            break;
-        }
-
-        if (!node->MountCreatureID[team == ALLIANCE ? 1 : 0] && node->MountCreatureID[0] != 32981) // dk flight
+        if (!node || node->map_id != mapid || (!node->MountCreatureID[team == ALLIANCE ? 1 : 0] && node->MountCreatureID[0] != 32981)) // dk flight
             continue;
 
         uint8  field   = (uint8)((i - 1) / 32);
@@ -5533,7 +5521,7 @@ uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid, ui
         if ((sTaxiNodesMask[field] & submask) == 0)
             continue;
 
-        //float dist2 = (node->x - x)*(node->x - x)+(node->y - y)*(node->y - y)+(node->z - z)*(node->z - z);
+        float dist2 = (node->x - x)*(node->x - x)+(node->y - y)*(node->y - y)+(node->z - z)*(node->z - z);
         if (found)
         {
             if (dist2 < dist)
@@ -5549,9 +5537,7 @@ uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid, ui
             id = i;
         }
     }
-    // movement anticheat fix
-    if (dist > 3600) id = 0;
-    // movement anticheat fix
+
     return id;
 }
 
@@ -7820,6 +7806,25 @@ GameTele const* ObjectMgr::GetGameTele(const std::string& name) const
     }
 
     return alt;
+}
+
+GameTele const* ObjectMgr::GetGameTeleExactName(const std::string& name) const
+{
+    // explicit name case
+    std::wstring wname;
+    if (!Utf8toWStr(name, wname))
+        return NULL;
+
+    // converting string that we try to find to lower case
+    wstrToLower(wname);
+
+    for (GameTeleContainer::const_iterator itr = _gameTeleStore.begin(); itr != _gameTeleStore.end(); ++itr)
+    {
+        if (itr->second.wnameLow == wname)
+            return &itr->second;
+    }
+
+    return NULL;
 }
 
 bool ObjectMgr::AddGameTele(GameTele& tele)

@@ -684,7 +684,7 @@ public:
             {
                 float aftercrit = 0.f;
                 //Fanaticism: 18% additional critical chance for all Judgements (not shure which check is right)
-                if (lvl >= 45 && (spellInfo->Category == SPELLCATEGORY_JUDGEMENT || spellInfo->GetSpellSpecific() == SPELL_SPECIFIC_JUDGEMENT))
+                if (lvl >= 45 && (spellInfo->CategoryEntry->Id == SPELLCATEGORY_JUDGEMENT || spellInfo->GetSpellSpecific() == SPELL_SPECIFIC_JUDGEMENT))
                     aftercrit += 18.f;
 
                 if (aftercrit > 0.f)
@@ -701,7 +701,7 @@ public:
                 pctbonus += 0.15f;
             //The Art of War (damage part): 10% bonus damage for Judgements, Crusader Strike and Divine Storm
             if (lvl >= 40 &&
-                (spellInfo->Category == SPELLCATEGORY_JUDGEMENT ||
+                (spellInfo->CategoryEntry->Id == SPELLCATEGORY_JUDGEMENT ||
                 spellInfo->GetSpellSpecific() == SPELL_SPECIFIC_JUDGEMENT || 
                 spellId == CRUSADER_STRIKE ||
                 spellId == DIVINE_STORM))

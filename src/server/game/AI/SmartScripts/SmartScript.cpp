@@ -2686,7 +2686,7 @@ void SmartScript::ProcessEvent(SmartScriptHolder& e, Unit* unit, uint32 var0, ui
                 ProcessTimedAction(e, e.event.minMaxRepeat.repeatMin, e.event.minMaxRepeat.repeatMax, me->GetVictim());
             break;
         }
-        case SMART_EVENT_TARGET_CASTING:
+        case SMART_EVENT_VICTIM_CASTING:
         {
             if (!me || !me->IsInCombat())
                 return;
@@ -3148,7 +3148,7 @@ void SmartScript::UpdateTimer(SmartScriptHolder& e, uint32 const diff)
             case SMART_EVENT_MANA_PCT:
             case SMART_EVENT_TARGET_MANA_PCT:
             case SMART_EVENT_RANGE:
-            case SMART_EVENT_TARGET_CASTING:
+            case SMART_EVENT_VICTIM_CASTING:
             case SMART_EVENT_FRIENDLY_HEALTH:
             case SMART_EVENT_FRIENDLY_IS_CC:
             case SMART_EVENT_FRIENDLY_MISSING_BUFF:
@@ -3363,43 +3363,29 @@ void SmartScript::OnMoveInLineOfSight(Unit* who)
 }
 
 /*
-void SmartScript::UpdateAIWhileCharmed(const uint32 diff)
-{
-}
+void SmartScript::UpdateAIWhileCharmed(const uint32 diff) { }
 
-void SmartScript::DoAction(const int32 param)
-{
-}
+void SmartScript::DoAction(const int32 param) { }
 
 uint32 SmartScript::GetData(uint32 id)
 {
     return 0;
 }
 
-void SmartScript::SetData(uint32 id, uint32 value)
-{
-}
+void SmartScript::SetData(uint32 id, uint32 value) { }
 
-void SmartScript::SetGUID(uint64 guid, int32 id)
-{
-}
+void SmartScript::SetGUID(uint64 guid, int32 id) { }
 
 uint64 SmartScript::GetGUID(int32 id)
 {
     return 0;
 }
 
-void SmartScript::MovepointStart(uint32 id)
-{
-}
+void SmartScript::MovepointStart(uint32 id) { }
 
-void SmartScript::SetRun(bool run)
-{
-}
+void SmartScript::SetRun(bool run) { }
 
-void SmartScript::SetMovePathEndAction(SMART_ACTION action)
-{
-}
+void SmartScript::SetMovePathEndAction(SMART_ACTION action) { }
 
 uint32 SmartScript::DoChat(int8 id, uint64 whisperGuid)
 {
